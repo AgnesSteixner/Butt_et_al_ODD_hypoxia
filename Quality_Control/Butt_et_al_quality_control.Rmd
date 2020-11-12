@@ -1,0 +1,119 @@
+---
+title: "Butt et al: scRNAseq analysis"
+author: "Agnes A. Steixner-Kumar"
+date: "12 11 2020"
+output: 
+  html_document: 
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 13
+    number_sections: yes
+    toc: yes
+    toc_float: true
+  html_notebook: 
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 13
+    number_sections: yes
+    toc: yes
+  pdf_document:
+    latex_engine: xelatex 
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 13
+    keep_tex: no
+    number_sections: yes
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Libraries and load data
+# load library
+```{r libraries, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+library(Seurat)
+```
+## Load 10X data
+```{r load_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+hypoxia_1<-Read10X("Hypoxia_1")
+hypoxia_2<-Read10X("Hypoxia_2")
+normoxia_1<-Read10X("Normoxia_1")
+normoxia_2<-Read10X("Normoxia_2")
+```
+
+# Prepare Seurat objects
+```{r prep_objects, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# Paste sample identifier in front of cell ID
+colnames(hypoxia_1)<-paste0('hyp1_', colnames(hypoxia_1))
+colnames(hypoxia_2)<-paste0('hyp2_', colnames(hypoxia_2))
+colnames(normoxia_1)<-paste0('nor1_', colnames(normoxia_1))
+colnames(normoxia_2)<-paste0('nor2_', colnames(normoxia_2))
+
+```
+
+```{r create_objects, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# create seurat objects
+hypoxia_1<-CreateSeuratObject(hypoxia_1, min.cells=3, min.genes=200, project="hypoxia_5x")
+hypoxia_2<-CreateSeuratObject(hypoxia_2, min.cells=3, min.genes=200, project="hypoxia_5x")
+normoxia_1<-CreateSeuratObject(normoxia_1, min.cells=3, min.genes=200, project="normoxia_5x")
+normoxia_2<-CreateSeuratObject(normoxia_2, min.cells=3, min.genes=200, project="normoxia_5x")
+```
+
+```{r make_list, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# make list of seurat objects for easier handling
+obj<-list(hypoxia_1=hypoxia_1,hypoxia_2=hypoxia_2, normoxia_1=normoxia_1, normoxia_2=normoxia_2, hifko_1=hifko_1, hifko_2=hifko_2)
+# create list of sample names
+samnam<-c('hypoxia_1', 'hypoxia_2', 'normoxia_1', 'normoxia_2')
+# set name for objects in list
+names(obj)<-samnam
+```
+# Calculate and plot basic features
+```{r basic_features, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# select all mitochondrial gene names (13 genes, same in all samples)
+mito<-lapply(obj, function(x) grep("^mt", rownames(x@data), value=T))
+# calculate percentage of mitochondrial gene per cell and sample
+percent.mito<-lapply(obj, function(x) Matrix::colSums(x@raw.data[mito$hypoxia_1, ])/Matrix::colSums(x@raw.data))
+# add mito percentage to metadata
+obj<-lapply(seq_along(samnam), function(x) AddMetaData(obj[[x]], metadata=percent.mito[[x]], col.name="percent.mito"))
+# plot basic featuers nGene, nUMI and percent.mito
+mitoplot<-lapply(obj, function(x) VlnPlot(x, features.plot=c("nGene", "nUMI", "percent.mito"), nCol = 3))
+print(mitoplot)
+# plot nUMI by percent.mito/nGene to see distribution and decide on filtering cutoffs
+lapply(obj, function(x) GenePlot(x, gene1 = "nUMI", gene2 = "percent.mito"))
+lapply(obj, function(x) GenePlot(x, gene1 = "nUMI", gene2 = "nGene"))
+
+```
+
+# Filter cells
+```{r filter_cells, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+obj[[1]] <- FilterCells(obj[[1]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
+obj[[2]] <- FilterCells(obj[[2]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
+obj[[3]] <- FilterCells(obj[[3]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
+obj[[4]] <- FilterCells(obj[[4]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
+o
+```
+
+# Normalize data
+```{r normalize_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+obj <- lapply(obj, function(x) NormalizeData(x, normalization.method = "LogNormalize", scale.factor = 10000))
+```
+
+# Define variable genes
+```{r var_genes, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+obj<- lapply(obj, function(x) FindVariableGenes(object = x, mean.function = ExpMean, dispersion.function = LogVMR, 
+    x.low.cutoff = 0.0125, x.high.cutoff = 3, y.cutoff = 0.5))
+```
+
+# Scale data and regress out nUMI and percent.mito
+```{r scale_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+obj<- lapply(obj, function(x) ScaleData(object = x, vars.to.regress = c("nUMI", "percent.mito")))
+```
+# Save objects
+```{r save_obj, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+lapply(seq_along(samnam), function(x) saveRDS(obj[[x]], file=paste0(samnam[x], ".rds")))
+```
+
+```{r, tidy=TRUE, tidy.opts=list(width.cutoff=80)}
+sessionInfo()
+```
+
