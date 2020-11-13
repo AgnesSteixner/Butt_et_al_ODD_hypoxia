@@ -1,5 +1,5 @@
 ---
-title: "Butt et al: scRNAseq analysis"
+title: "Butt et al: scRNAseq analysis - QC"
 author: "Agnes A. Steixner-Kumar"
 date: "12 11 2020"
 output: 
@@ -16,6 +16,7 @@ output:
     fig_width: 13
     number_sections: yes
     toc: yes
+    df_print: paged
   pdf_document:
     latex_engine: xelatex 
     fig_caption: yes
@@ -29,9 +30,9 @@ editor_options:
 ---
 
 # Libraries and load data
-# load library
+## Load library
 ```{r libraries, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-library(Seurat)
+library(Seurat) #v2.3.0
 ```
 ## Load 10X data
 ```{r load_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
@@ -52,16 +53,16 @@ colnames(normoxia_2)<-paste0('nor2_', colnames(normoxia_2))
 ```
 
 ```{r create_objects, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-# create seurat objects
-hypoxia_1<-CreateSeuratObject(hypoxia_1, min.cells=3, min.genes=200, project="hypoxia_5x")
-hypoxia_2<-CreateSeuratObject(hypoxia_2, min.cells=3, min.genes=200, project="hypoxia_5x")
-normoxia_1<-CreateSeuratObject(normoxia_1, min.cells=3, min.genes=200, project="normoxia_5x")
-normoxia_2<-CreateSeuratObject(normoxia_2, min.cells=3, min.genes=200, project="normoxia_5x")
+# create Seurat objects
+hypoxia_1<-CreateSeuratObject(hypoxia_1, min.cells=3, min.genes=200, project="hypoxia_1")
+hypoxia_2<-CreateSeuratObject(hypoxia_2, min.cells=3, min.genes=200, project="hypoxia_2")
+normoxia_1<-CreateSeuratObject(normoxia_1, min.cells=3, min.genes=200, project="normoxia_1")
+normoxia_2<-CreateSeuratObject(normoxia_2, min.cells=3, min.genes=200, project="normoxia_2")
 ```
 
 ```{r make_list, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-# make list of seurat objects for easier handling
-obj<-list(hypoxia_1=hypoxia_1,hypoxia_2=hypoxia_2, normoxia_1=normoxia_1, normoxia_2=normoxia_2, hifko_1=hifko_1, hifko_2=hifko_2)
+# make list of Seurat objects for easier handling
+obj<-list(hypoxia_1=hypoxia_1,hypoxia_2=hypoxia_2, normoxia_1=normoxia_1, normoxia_2=normoxia_2)
 # create list of sample names
 samnam<-c('hypoxia_1', 'hypoxia_2', 'normoxia_1', 'normoxia_2')
 # set name for objects in list
@@ -90,7 +91,6 @@ obj[[1]] <- FilterCells(obj[[1]], subset.names = c("nGene", "percent.mito"), low
 obj[[2]] <- FilterCells(obj[[2]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
 obj[[3]] <- FilterCells(obj[[3]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
 obj[[4]] <- FilterCells(obj[[4]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
-o
 ```
 
 # Normalize data
@@ -105,11 +105,11 @@ obj<- lapply(obj, function(x) FindVariableGenes(object = x, mean.function = ExpM
 ```
 
 # Scale data and regress out nUMI and percent.mito
-```{r scale_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+```{r scale_data, echo=TRUE, message=FALSE, warning=FALSE, results='hide', paged.print=TRUE}
 obj<- lapply(obj, function(x) ScaleData(object = x, vars.to.regress = c("nUMI", "percent.mito")))
 ```
 # Save objects
-```{r save_obj, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+```{r save_obj, echo=TRUE, message=FALSE, warning=FALSE, results='hide', paged.print=TRUE}
 lapply(seq_along(samnam), function(x) saveRDS(obj[[x]], file=paste0(samnam[x], ".rds")))
 ```
 
