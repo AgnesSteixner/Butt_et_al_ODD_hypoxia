@@ -73,11 +73,14 @@ names(obj)<-samnam
 # select all mitochondrial gene names (13 genes, same in all samples)
 mito<-lapply(obj, function(x) grep("^mt", rownames(x@data), value=T))
 # calculate percentage of mitochondrial gene per cell and sample
-percent.mito<-lapply(obj, function(x) Matrix::colSums(x@raw.data[mito$hypoxia_1, ])/Matrix::colSums(x@raw.data))
+percent.mito<-lapply(obj, function(x) Matrix::colSums(x@raw.data[mito$hypoxia_1, ])/
+                       Matrix::colSums(x@raw.data))
 # add mito percentage to metadata
-obj<-lapply(seq_along(samnam), function(x) AddMetaData(obj[[x]], metadata=percent.mito[[x]], col.name="percent.mito"))
+obj<-lapply(seq_along(samnam), function(x) AddMetaData(obj[[x]], metadata=percent.mito[[x]], 
+                                                       col.name="percent.mito"))
 # plot basic featuers nGene, nUMI and percent.mito
-mitoplot<-lapply(obj, function(x) VlnPlot(x, features.plot=c("nGene", "nUMI", "percent.mito"), nCol = 3))
+mitoplot<-lapply(obj, function(x) VlnPlot(x, features.plot=c("nGene", "nUMI", "percent.mito"), 
+                                          nCol = 3))
 print(mitoplot)
 # plot nUMI by percent.mito/nGene to see distribution and decide on filtering cutoffs
 lapply(obj, function(x) GenePlot(x, gene1 = "nUMI", gene2 = "percent.mito"))
@@ -87,20 +90,26 @@ lapply(obj, function(x) GenePlot(x, gene1 = "nUMI", gene2 = "nGene"))
 
 # Filter cells
 ```{r filter_cells, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-obj[[1]] <- FilterCells(obj[[1]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
-obj[[2]] <- FilterCells(obj[[2]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
-obj[[3]] <- FilterCells(obj[[3]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
-obj[[4]] <- FilterCells(obj[[4]], subset.names = c("nGene", "percent.mito"), low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
+obj[[1]] <- FilterCells(obj[[1]], subset.names = c("nGene", "percent.mito"), 
+                        low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
+obj[[2]] <- FilterCells(obj[[2]], subset.names = c("nGene", "percent.mito"), 
+                        low.thresholds = c(500, -Inf), high.thresholds = c(6000, 0.2))
+obj[[3]] <- FilterCells(obj[[3]], subset.names = c("nGene", "percent.mito"), 
+                        low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
+obj[[4]] <- FilterCells(obj[[4]], subset.names = c("nGene", "percent.mito"), 
+                        low.thresholds = c(500, -Inf), high.thresholds = c(7500, 0.2))
 ```
 
 # Normalize data
 ```{r normalize_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-obj <- lapply(obj, function(x) NormalizeData(x, normalization.method = "LogNormalize", scale.factor = 10000))
+obj <- lapply(obj, function(x) NormalizeData(x, normalization.method = "LogNormalize", 
+                                             scale.factor = 10000))
 ```
 
 # Define variable genes
 ```{r var_genes, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-obj<- lapply(obj, function(x) FindVariableGenes(object = x, mean.function = ExpMean, dispersion.function = LogVMR, 
+obj<- lapply(obj, function(x) FindVariableGenes(object = x, mean.function = ExpMean, 
+                                                dispersion.function = LogVMR, 
     x.low.cutoff = 0.0125, x.high.cutoff = 3, y.cutoff = 0.5))
 ```
 
