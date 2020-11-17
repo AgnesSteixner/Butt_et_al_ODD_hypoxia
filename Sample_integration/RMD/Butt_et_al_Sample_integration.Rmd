@@ -32,23 +32,75 @@ editor_options:
 # Libraries and load data
 ## Load library
 ```{r libraries, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
-library(Seurat, lib.loc = "D:/Users/Steixner/Documents/R/R-3.5.2/library/Seurat_3.0.0/") #v3.0.0
+library(Seurat, lib.loc = "../R/R-3.6.0/library/Seurat_3.0.0/") #v3.0.0
+library(cowplot)
+library(dplyr)
 ```
 
-# Load data
-```{r}
-hypox_1<-readRDS("hypoxia_1.rds")
-hypox_2<-readRDS("hypoxia_2.rds")
-normox_1<-readRDS("normoxia_1.rds")
-normox_2<-readRDS("normoxia_2.rds")
+## Load data
+```{r load_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+hypox_1<-readRDS("../../Quality_Control/QCed_RDS/hypoxia_1.rds")
+hypox_2<-readRDS("../../Quality_Control/QCed_RDS/hypoxia_2.rds")
+normox_1<-readRDS("../../Quality_Control/QCed_RDS/normoxia_1.rds")
+normox_2<-readRDS("../../Quality_Control/QCed_RDS/normoxia_2.rds")
+```
 
+```{r}
+set.seed(789)
+```
+
+Define group identity
+```{r define_group, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
 hypox_1@meta.data$group<-"Hypoxia"
 hypox_2@meta.data$group<-"Hypoxia"
 normox_1@meta.data$group<-"Normoxia"
 normox_2@meta.data$group<-"Normoxia"
+```
 
+Update Seurat objects to newer Seurat version
+```{r update_objects, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
 hypox_1<-UpdateSeuratObject(hypox_1)
 hypox_2<-UpdateSeuratObject(hypox_2)
 normox_1<-UpdateSeuratObject(normox_1)
 normox_2<-UpdateSeuratObject(normox_2)
+```
+
+# Integrate data
+```{r integrate, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD.anchors <- FindIntegrationAnchors(object.list = list(hypox_1, hypox_2, normox_1, normox_2), dims = 1:20)
+ODD.multiCCA <- IntegrateData(anchorset = ODD.anchors, dims = 1:20)
+```
+
+# Scale and run PCA
+```{r scaling_PCA, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD.multiCCA <- ScaleData(ODD.multiCCA, verbose = FALSE)
+ODD.multiCCA <- RunPCA(ODD.multiCCA, npcs = 30, verbose = FALSE)
+```
+
+## Plot PCs
+```{r plot_PCs, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+p1<-DimPlot(ODD.multiCCA, reduction = "pca", group.by = "orig.ident")
+p2<-DimPlot(ODD.multiCCA, reduction = "pca", group.by = "group")
+plot_grid(p1, p2)
+ElbowPlot(ODD.multiCCA, ndims = 30, reduction = "pca")
+```
+
+# Run UMAP
+```{r umap, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+set.seed(789)
+ODD.multiCCA <- RunUMAP(ODD.multiCCA, reduction = "pca", dims = 1:30)
+```
+
+# Clustering
+```{r clustering, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD.multiCCA <- FindNeighbors(ODD.multiCCA, reduction = "pca", dims = 1:30)
+ODD.multiCCA <- FindClusters(ODD.multiCCA, resolution = 0.2)
+```
+
+## Plot UMAP embedding
+```{r plot_UMAP, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+p1 <- DimPlot(ODD.multiCCA, reduction = "umap", group.by = "group")
+p2 <- DimPlot(ODD.multiCCA, reduction = "umap")
+p3 <- DimPlot(ODD.multiCCA)
+plot_grid(p1, p2, p3)
 ```
