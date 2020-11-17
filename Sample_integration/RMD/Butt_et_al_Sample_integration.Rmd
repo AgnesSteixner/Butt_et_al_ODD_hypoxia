@@ -45,10 +45,6 @@ normox_1<-readRDS("../../Quality_Control/QCed_RDS/normoxia_1.rds")
 normox_2<-readRDS("../../Quality_Control/QCed_RDS/normoxia_2.rds")
 ```
 
-```{r}
-set.seed(789)
-```
-
 Define group identity
 ```{r define_group, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
 hypox_1@meta.data$group<-"Hypoxia"
