@@ -1,0 +1,142 @@
+---
+title: "Butt et al: scRNAseq analysis - Doublet removal"
+author: "Agnes A. Steixner-Kumar"
+date: "17 11 2020"
+output: 
+  pdf_document:
+    latex_engine: xelatex 
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 13
+    keep_tex: no
+    number_sections: yes
+    toc: yes
+  html_notebook: 
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 13
+    number_sections: yes
+    toc: yes
+    df_print: paged
+  html_document: 
+    fig_caption: yes
+    fig_height: 8
+    fig_width: 13
+    number_sections: yes
+    toc: yes
+    toc_float: true
+editor_options: 
+  chunk_output_type: inline
+---
+
+# Libraries and load data
+## Load library
+```{r libraries, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+library(Seurat, lib.loc = "../R/R-3.6.0/library/Seurat_3.0.0/") #v3.0.0
+library(cowplot)
+library(dplyr)
+```
+
+## Load integrated object
+This is the object obtained after running QC and sample integration scripts
+```{r load_data, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD<-readRDS("../Sample_integration/RDS/ODD_integrated.RDS")
+```
+
+# Define identities
+## Plot clusters and find cluster markers
+```{r dimplot_pre_fixing, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+DimPlot(ODD)
+```
+```{r find_markers, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+cluster_markers<-FindAllMarkers(ODD, logfc.threshold = 0.5)
+```
+
+## Rename clusters and merge similar clusters
+```{r rename_merge, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD<-RenameIdents(ODD, `0` = "Glutamatergic0", `1` = "Glutamatergic1", `2` = "Oligodendrocytes", 
+    `3` = "Glutamatergic1", `4` = "Glutamatergic2", `5` = "Endothelial", `6` = "Astrocytes", `7` = "Gabaergic", 
+    `8` = "Neuron_Oligo_Doublets", `9` = "Microglia", `10` = "Glutamatergic3", `11` = "Glutamatergic3", `12` = "Mural_cells", 
+    `13` = "Glutamatergic4", '14'="OPC", '15' = "Mossy_cells", '16'= "Oligo_Astro_Doublets","17"="Red_blood_cells", "18"="Endo_Oligo_Doublets", "19"="Ependymal_cells","20"="Neuroblasts")
+DimPlot(ODD)
+```
+## Identify additional doublet "islands"
+```{r extra_doublets, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# Mural-oligodendrocyte doublets
+# get embeddings of subcluster of mural-oligo doublets
+mural_doubl<-rownames(Embeddings(ODD[["umap"]]))[Embeddings(ODD[["umap"]])[,1]>5&Embeddings(ODD[["umap"]])[,1]<10&
+                                                abs(Embeddings(ODD[["umap"]])[,2])<2.5]
+# make sure to only include cells of "mural" identity
+mural_doubl<-intersect(mural_doubl, WhichCells(ODD, idents = "Mural_cells"))
+
+# create doublet identity
+Idents(ODD, cells=mural_doubl)<-"Mural_Oligo_Doublets"
+
+# Microglia-Oligodendrocyte doublets
+# make use of higher resolution clustering (resolution=0.4) to single out microglia-oligo doublets,
+# alternatively use embeddings as above
+micro_doubl<-colnames(ODD)[ODD$integrated_snn_res.0.4=="24"]
+Idents(ODD, cells=micro_doubl)<-"Micro_Oligo_Doublets"
+
+# Remove all doublet clusters from object
+ODD<-SubsetData(ODD, ident.remove = c("Oligo_Astro_Doublets", "Endo_Oligo_Doublets", "Mural_Oligo_Doublets", "Micro_Oligo_Doublets", "Neuron_Oligo_Doublets"))
+```
+
+```{r plot_clusters, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+DimPlot(ODD, label = T)
+```
+# DoubletFinder (McGinnis et al, 2019)
+## Prepare samples
+```{r prep_samples, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# split object into samples
+ODD_split<-SplitObject(ODD, split.by = "orig.ident")
+# normalize
+ODD_split<-lapply(ODD_split, function(x) NormalizeData(x))
+# scale
+ODD_split<-lapply(ODD_split, function(x) ScaleData(x))
+# define variable feature
+ODD_split<-lapply(ODD_split, function(x) FindVariableFeatures(x))
+# PCA
+ODD_split<-lapply(ODD_split, function(x) RunPCA(x, npcs = 30))
+```
+
+## Find DoubletFinder parameters
+```{r doubletfinder_params, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+# find pK
+sweep.res<- lapply(ODD_split, function(x) paramSweep_v3(x, PCs = 1:20, sct = FALSE))
+sweep.stats <- lapply(sweep.res, function(x) summarizeSweep(x, GT = FALSE))
+bcmvn <- lapply(sweep.stats, function(x) find.pK(x))
+# save cluster annotations
+annotations <- lapply(ODD_split, function(x) x@meta.data$integrated_snn_res.0.2)
+# model homotypic doublet rate
+homotypic.prop <- lapply(annotations, function(x) modelHomotypic(x))
+nExp_poi <- lapply(ODD_split, function(x) round(0.05*length(colnames(x))))  # Assuming 5% doublet formation rate because ~3.6% were already removed manually
+nExp_poi.adj <- lapply(seq_along(lengths(ODD_split)), function(x) round(nExp_poi[[x]]*(1-homotypic.prop[[x]])))
+```
+
+## Run DoubletFinder
+```{r run_doubletfinder, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD_split<-lapply(seq_along(lengths(ODD_split)), function(x) doubletFinder_v3(ODD_split[[x]], PCs = 1:20, pK = as.numeric(as.character(bcmvn[[x]]$pK[bcmvn[[x]]$BCmetric==max(bcmvn[[x]]$BCmetric)])), nExp = nExp_poi.adj[[x]],reuse.pANN = FALSE, sct=FALSE))
+```
+
+## Plot predicted doublets
+```{r plot_doublets, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+lapply(ODD_split, function(x) DimPlot(x, group.by = colnames(x@meta.data)[grep('DF.classi', colnames(x@meta.data))], reduction = 'umap'))
+```
+## Get doublet IDs
+```{r list_doubletID, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+doubl_IDs<-lapply(ODD_split, function(x) colnames(x)[x@meta.data[grep('DF.classi', colnames(x@meta.data))]=="Doublet"])
+doubl_IDs<-unlist(doubl_IDs)
+```
+
+## Remove predicted doublets from object
+```{r remove_doublets, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE}
+ODD<-subset(ODD, cells = doubl_IDs, invert=T)
+```
+
+Save final object and doublet IDs. List of doublet IDs is also available in the github folder
+```{r save_object, echo=TRUE, message=FALSE, warning=FALSE, paged.print=TRUE, eval=FALSE}
+saveRDS(ODD_final, 'RDS/Butt_et_al_hypoxia_Seurat.RDS')
+write.table(doubl_IDs, "DoubletFinder_Doublet_IDs.txt", row.names = F, col.names = F)
+```
+
