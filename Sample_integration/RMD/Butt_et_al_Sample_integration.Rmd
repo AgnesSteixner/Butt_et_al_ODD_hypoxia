@@ -1,5 +1,5 @@
 ---
-title: "Butt et al: scRNAseq analysis - "
+title: "Butt et al: scRNAseq analysis - Sample integration and clustering"
 author: "Agnes A. Steixner-Kumar"
 date: "12 11 2020"
 output: 
