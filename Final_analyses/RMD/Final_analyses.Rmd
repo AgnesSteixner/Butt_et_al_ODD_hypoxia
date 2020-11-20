@@ -1,7 +1,7 @@
 ---
 title: "Butt et al: scRNAseq analysis - Final analyses"
 author: "Agnes A. Steixner-Kumar"
-date: "18 11 2020"
+date: "20 11 2020"
 output: 
   pdf_document:
     latex_engine: xelatex 
@@ -28,9 +28,22 @@ output:
 editor_options: 
   chunk_output_type: inline
 ---
+
+```{r setup, echo=FALSE, warning=F}
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE, 
+                      echo = TRUE)
+```
+
+```{r packrat, echo=FALSE, eval=F}
+options(repos=structure(BiocManager::repositories()))
+packrat::init()
+packrat::snapshot()
+```
+
 # Load libraries and data
 ## Load libraries
-```{r}
+```{r load_lib, paged.print=TRUE, cache=FALSE}
 library(reshape2)
 library(RColorBrewer)
 library(grid)
@@ -42,14 +55,37 @@ library(scales)
 ```
 
 ## Load data
-```{r}
+This is the final .RDS object as uploaded on GEO (GSExxx)
+```{r load_data, paged.print=TRUE}
 ODD<-readRDS("F:/GEO_submission_Butt_et_al/Butt_et_al_hypoxia_Seurat.RDS")
 ```
 
 # Analysis
+## Figure 4A
+### Define colors
+```{r config_colors, paged.print=TRUE}
+identities <- levels(Idents(ODD))
+my_color_palette <- hue_pal()(length(identities))
+my_color_palette <-c('brown2', my_color_palette[2:16])
+```
+
+### Shift ependymal cluster upwards
+```{r shift_embedding, paged.print=TRUE}
+emb<-Embeddings(ODD, reduction = "umap")
+#shift selected cells upwards on UMAP2
+emb[,2][emb[,2]<(-15)]<-emb[,2][emb[,2]<(-15)]+12
+#feed changed embeddings back into object
+ODD@reductions$umap@cell.embeddings<-emb
+```
+
+### Make plot of UMAP embedding
+```{r dimplot, fig.align="center", paged.print=TRUE}
+DimPlot(ODD, reduction = 'umap', label =F, repel = T, cols = my_color_palette)+NoLegend()+NoAxes()
+```
+
 ## Figure 4B
 ### Create dataframe of ODD &/or tdTomato+ cells
-```{r}
+```{r ODD_tdT_df, paged.print=TRUE}
 # prepare dataframe
 ODD_tdTom_cluster<-data.frame(matrix(nrow = ncol(ODD), ncol = 5), row.names = colnames(ODD))
 colnames(ODD_tdTom_cluster)=c("Cluster", "Group", "ODD", "tdTomato", "Expression")
@@ -67,7 +103,7 @@ ODD_tdTom_cluster$Expression[ODD_tdTom_cluster$ODD==0 & ODD_tdTom_cluster$tdToma
 ODD_tdTom_cluster$Expression[ODD_tdTom_cluster$ODD>0 & ODD_tdTom_cluster$tdTomato>0]<-"both"
 ```
 ### Count positive cells
-```{r}
+```{r count_ODD_tdT, paged.print=TRUE}
 # create count table
 ODD_tdTom_cluster_counts<-ODD_tdTom_cluster %>%
  group_by(Cluster, Expression, Group) %>%
@@ -77,7 +113,7 @@ ODD_tdTom_cluster_counts$Expression<-factor(ODD_tdTom_cluster_counts$Expression,
 ```
 
 ### Clean up cluster lables
-```{r}
+```{r clean_labels, paged.print=TRUE}
 cluster_labels<-as.character(unique(ODD_tdTom_cluster_counts$Cluster))
 cluster_labels<-gsub('_', ' ', cluster_labels)
 cluster_labels<-gsub('cells', '', cluster_labels)
@@ -85,7 +121,7 @@ cluster_labels<-gsub(' $', '', cluster_labels)
 cluster_labels
 ```
 ### Plot proportions
-```{r}
+```{r ODD_tdT_prop_graph, fig.align="center", paged.print=TRUE}
 ggplot(ODD_tdTom_cluster_counts, aes(y=n, x=Cluster, fill=Expression)) +  
   geom_bar( stat="identity", position="fill")+
   scale_y_continuous(labels= scales::percent)+
@@ -99,10 +135,49 @@ ggplot(ODD_tdTom_cluster_counts, aes(y=n, x=Cluster, fill=Expression)) +
   theme(plot.margin=unit(c(0.3,3.6,0,0.7), "cm"))
 ```
 
+## Figure 4C
+### Split objects by group
+```{r split_nor_hyp, paged.print=TRUE}
+Idents(ODD)<-ODD$group
+ODD_norm<-subset(ODD, idents = "Normoxia")
+ODD_hyp<-subset(ODD, idents = "Hypoxia")
+```
+
+### Make normoxia feature plots
+```{r normoxia_ftplots, fig.align="center", paged.print=TRUE}
+lapply(c("ODD", "tdTomato", "Vegfa"), function(x) FeaturePlot(
+            ODD_norm, features = x, pt.size = 0.7, order=F, min.cutoff = 0.5,
+            max.cutoff = 2, cols = (c("bisque2", "black")))+
+            NoAxes()+
+            ggtitle(x)+
+            NoLegend())
+# order cells with regard to expression to prevent masking
+FeaturePlot(ODD_norm, features = "Hk2", pt.size = 0.7, order=T, min.cutoff = 0.5,
+            max.cutoff = 2, cols = c("bisque2", "black"))+
+            NoAxes()+
+            ggtitle("Hk2")+
+            NoLegend()
+```
+
+### Make hypoxia feature plots
+```{r hypoxia_ftplots, fig.align="center", paged.print=TRUE}
+lapply(c("ODD", "tdTomato", "Vegfa"), function(x) FeaturePlot(
+            ODD_hyp, features = x, pt.size = 0.7, order=F, min.cutoff = 0.5,
+            max.cutoff = 2, cols = (c("bisque2", "black")))+
+            NoAxes()+
+            ggtitle(x)+
+            NoLegend())
+# order cells with regard to expression to prevent masking
+FeaturePlot(ODD_hyp, features = "Hk2", pt.size = 0.7, order=T, min.cutoff = 0.5,
+            max.cutoff = 2, cols = c("bisque2", "black"))+
+            NoAxes()+
+            ggtitle("Hk2")+
+            NoLegend()
+```
 ## Figure 4D
 ### Create rough identity clusters
 These cell types correspond to cell types distinguished in immunofluorescence quantifications
-```{r}
+```{r rough_clusters, paged.print=TRUE}
 ODD$rough_ident<-NA
 # merge all neuronal types
 ODD$rough_ident[ODD$final_identity=="Glutamatergic1"|ODD$final_identity=="Glutamatergic0"|ODD$final_identity=="Glutamatergic2"|
@@ -113,7 +188,7 @@ ODD$rough_ident[ODD$final_identity=="Microglia"]<-"Microglia"
 ODD$rough_ident[ODD$final_identity=="Endothelial"]<-"Endothelial"
 ```
 ### Create dataframe of binary Hk2 expression 
-```{r}
+```{r Hk2_df, paged.print=TRUE}
 # prepare dataframe
 Hk2_cluster<-data.frame(matrix(nrow = sum(!is.na(ODD$rough_ident)), ncol = 4), row.names = colnames(ODD)[!is.na(ODD$rough_ident)])
 colnames(Hk2_cluster)=c("Cluster", "Group", "Hk2", "Hif1a")
@@ -133,18 +208,19 @@ Hk2_cluster_prop<-Hk2_cluster %>%
 
 ```
 ### Perform chi-square tests per cluster
-```{r}
-lapply(unique(Hk2_cluster_prop$Cluster), function(x) {paste0(x, ": ",
-                                                      chisq.test(data.frame(c(Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][1],
-                                                                              Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][2]),
-                                                                            c(Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][3],
-                                                                              Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][4])), 
-                                                                  correct = T)$p.value)
+```{r chisq_cluster, paged.print=TRUE}
+lapply(unique(Hk2_cluster_prop$Cluster), function(x) {
+  paste0(x, ": ",
+  chisq.test(data.frame(c(Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][1],
+                          Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][2]),
+                        c(Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][3],
+                          Hk2_cluster_prop$n[Hk2_cluster_prop$Cluster==x][4])), 
+              correct = T)$p.value)
   }
        )
 ```
 ### Perform chi-square tests for total sample
-```{r}
+```{r chisq_total, paged.print=TRUE}
 # count positive/negative cells per group
 Hk2_cluster_prop_total<-Hk2_cluster %>%
  group_by(Group, Hk2_yn) %>%
@@ -157,7 +233,7 @@ chisq.test(data.frame(c(Hk2_cluster_prop_total$n[1],
                         Hk2_cluster_prop_total$n[4])), correct = F)$p.value
 ```
 ### Plot Hk2+ proportions per cluster
-```{r}
+```{r Hk2_prop_plot, fig.align="center", paged.print=TRUE}
 # make factor, order levels
 Hk2_cluster_prop$Cluster<-factor(Hk2_cluster_prop$Cluster, levels=c("Endothelial", 'Neurons', 'Astrocytes', "OPC, Oligo", 'Microglia'))
 
@@ -165,132 +241,70 @@ Hk2_cluster_prop$Cluster<-factor(Hk2_cluster_prop$Cluster, levels=c("Endothelial
 ggplot(data = Hk2_cluster_prop[Hk2_cluster_prop$Hk2_yn=="yes",], aes(x = Cluster, y = Percent)) +
   geom_col(aes(fill = Group, width=0.6), col='black' , show.legend = FALSE) +
   coord_flip()+ facet_wrap(~Group)+
-theme(axis.ticks.y=element_blank(), axis.text.y=element_text(size=22, angle = 0), axis.text.x=element_text(size=25), axis.title.y=element_blank(), axis.title.x=element_text(size=25), legend.text=element_text(size=16), 
-        legend.title=element_text(size=25))+
-scale_fill_manual(values = c("#FFBDBD","#512274"))+
-theme(strip.text.x = element_text(size = 30, colour = "black",margin = margin(0.5,0,0.5,0, "cm")))+
-      theme(aspect.ratio = 1/1.1)+scale_y_continuous( limits = c(0,20), expand = c(0,0))+
-theme(panel.spacing = unit(2, "lines"))+ylab('Percentage of Hk2 positive cells')+theme(plot.margin=unit(c(0,0.5,0,0), "cm"))
+  theme(axis.ticks.y=element_blank(), axis.text.y=element_text(size=22, angle = 0), 
+        axis.text.x=element_text(size=25), axis.title.y=element_blank(), axis.title.x=element_text(size=25), 
+        legend.text=element_text(size=16), legend.title=element_text(size=25))+
+  scale_fill_manual(values = c("#FFBDBD","#512274"))+
+  theme(strip.text.x = element_text(size = 30, colour = "black",margin = margin(0.5,0,0.5,0, "cm")))+
+  theme(aspect.ratio = 1/1.1)+
+  scale_y_continuous( limits = c(0,20), expand = c(0,0))+
+  theme(panel.spacing = unit(2, "lines"))+
+  ylab('Percentage of Hk2 positive cells')+
+  theme(plot.margin=unit(c(0,0.5,0,0), "cm"))
 ```
 
-```{r}
-ggplot(data = Hk2_cluster_prop[Hk2_cluster_prop$Hk2_yn=="yes",], aes(x = Cluster, y = Percent)) +
-    geom_col(aes(fill = Group, width=0.6), col='black' , show.legend = FALSE) +
-    coord_flip()+ facet_wrap(~Group)+
-    theme(axis.ticks.y=element_blank(), axis.text.y=element_blank(), axis.text.x=element_text(size=32), axis.title.y=element_blank(), axis.title.x=element_text(size=25), legend.text=element_text(size=15), 
-          legend.title=element_text(size=25))+
-    scale_fill_manual(values = c("#FFBDBD","#512274"))+
-    theme(strip.text.x = element_text(size = 30, colour = "black",margin = margin(0.5,0,0.5,0, "cm")))+
-    theme(aspect.ratio = 1/0.85)+scale_y_continuous( limits = c(0,20), expand = c(0,0))+
-    theme(panel.spacing = unit(2.5, "lines"))+ylab('Percentage of Hk2 positive cells')+theme(plot.margin=unit(c(0,0.61,0,0.18), "cm"))
+## Differential expression testing
+### Vegfa 
+```{r DE_Vegfa, paged.print=TRUE}
+# Test for overall differential expression between Normoxia and Hypoxia
+FindMarkers(ODD, ident.1 = 'Hypoxia', ident.2 = 'Normoxia', group.by = 'group', features = 'Vegfa')
+# Test for differential expression among clusters
+Idents(ODD)<-ODD$final_identity
+FindAllMarkers(ODD, features = "Vegfa")
 ```
-
-```{r}
+### Hk2
+```{r DE_Hk2, paged.print=TRUE, cache=FALSE}
+Idents(ODD)<-ODD$group
+# Microglial expression versus all other cells under normoxia
+FindMarkers(ODD, ident.1 = 'Microglia', subset.ident = 'Normoxia', group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
+# Microglial expression versus all other cells under hypoxia
+FindMarkers(ODD, ident.1 = 'Microglia', subset.ident = 'Hypoxia', group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
 ```
-
-```{r}
-identities <- levels(Idents(ODD_nodoub))
-my_color_palette <- hue_pal()(length(identities))
-my_color_palette
+## Supplementary info
+### Suppl. Figure 3
+```{r ODD_tdT_vlnplots, fig.align="center", paged.print=TRUE, cache=FALSE}
+Idents(ODD)<-ODD$final_identity
+# tdTomato violin plots
+VlnPlot(ODD, features = "tdTomato", cols = my_color_palette, pt.size = 0.1)+
+  NoLegend()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5))
+# ODD violin plots
+VlnPlot(ODD, features = "ODD", cols = my_color_palette, pt.size = 0.1)+
+  NoLegend()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5))
 ```
-
-```{r}
-my_color_palette <-c('brown2', my_color_palette[2:16])
+Test for expression differences in tdTomato and ODD between microglia and neurons
+```{r DE_ODD_tdT, paged.print=TRUE}
+FindMarkers(ODD, features = c("tdTomato", "ODD"), logfc.threshold = 0.01, ident.1 = "Microglia", ident.2 = c("Glutamatergic0", "Glutamatergic1", "Glutamatergic2", "Glutamatergic3", "Glutamatergic4", "Gabaergic", "Mossy_cells"))
 ```
-
-```{r}
-DimPlot(ODD_nodoub, reduction = 'umap', label =F, repel = T, cols = my_color_palette)+NoLegend()+NoAxes()
-ggsave(paste0(out_dir, "graphs/UMAP_figure_no_label_doubletclean.jpg"), width = 13.5, height = 10, units = "cm")
+### Suppl. Figure 4A
+```{r vegfa_vlnplots, fig.align="center", paged.print=TRUE}
+# Vegfa violin plots
+VlnPlot(ODD, features = "Vegfa", cols = c("pink","purple"), pt.size = 0.1, split.by = "group")+
+  NoLegend()+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))+
+  theme(plot.title = element_text(hjust = 0.5))
 ```
+### Suppl. Figure 4B
+```{r DE_vegfa, paged.print=TRUE}
+pvals_Vegfa<-lapply(levels(ODD), function(x) FindMarkers(ODD, ident.1 = "Hypoxia", ident.2 = "Normoxia", subset.ident = x, group.by = "group", features = "Vegfa", logfc.threshold = 0.01))
 
-```{r}
-cellID_dimex<-colnames(ODD_nodoub)[Embeddings(ODD_nodoub[["umap"]])[,2]>(-20)]
-length(cellID_dimex)
-dim(ODD_nodoub)
-head(cellID_dimex)
-cellID_norm<-intersect(colnames(ODD_nodoub)[ODD_nodoub$group=="Normoxia"], cellID_dimex)
-cellID_hyp<-intersect(colnames(ODD_nodoub)[ODD_nodoub$group=="Hypoxia"], cellID_dimex)
-length(cellID_norm)
-length(cellID_hyp)
-
+names(pvals_Vegfa)<-levels(ODD)
+dplyr::bind_rows(pvals_Vegfa, .id = "Cluster")
 ```
-
-```{r}
-ODD_norm<-subset(ODD_nodoub, cells = cellID_norm)
-FeaturePlot(ODD_norm, features = c("ODD"), pt.size = 0.7, order=F, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_ODD_min0.5_max2_normox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-
-ODD_hyp<-subset(ODD_nodoub, cells = cellID_hyp)
-FeaturePlot(ODD_hyp, features = c("ODD"), pt.size = 0.7, order=F, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_ODD_min0.5_max2_hypox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
+## Session info
+```{r session_info, tidy=TRUE, tidy.opts=list(width.cutoff=80)}
+sessionInfo()
 ```
-
-```{r}
-FeaturePlot(ODD_norm, features = c("tdTomato"), pt.size = 0.7, order=F, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_tdTomato_min0.5_max2_normox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-
-FeaturePlot(ODD_hyp, features = c("tdTomato"), pt.size = 0.7, order=F, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_tdTomato_min0.5_max2_hypox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-```
-
-```{r}
-FeaturePlot(ODD_norm, features = c("Vegfa"), pt.size = 0.7, order=F, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_Vegfa_min0.5_max2_normox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-
-FeaturePlot(ODD_hyp, features = c("Vegfa"), pt.size = 0.7, order=F, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_Vegfa_min0.5_max2_hypox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-
-```
-
-```{r}
-FeaturePlot(ODD_norm, features = c("Hk2"), pt.size = 0.7, order=T, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_Hk2_min0.5_max2_normox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-
-FeaturePlot(ODD_hyp, features = c("Hk2"), pt.size = 0.7, order=T, min.cutoff = 0.5, max.cutoff = 2, cols = (c("bisque2", "black")))+NoAxes()+ggtitle('')+
-NoLegend()+theme(plot.margin=unit(c(-1,-0.5,-0,-0.5), "cm"))
-ggsave(paste0(out_dir, "graphs/Featureplot_Hk2_min0.5_max2_hypox_figure_doubletclean.jpg"), width = 8, height = 6, units = "cm")
-
-```
-
-
-```{r}
-Vegfa_p<-FindMarkers(ODD_nodoub, ident.1 = 'Hypoxia', ident.2 = 'Normoxia', group.by = 'group', features = 'Vegfa')
-Vegfa_p
-```
-
-```{r}
-Idents(ODD_nodoub)<-ODD_nodoub$group
-levels(Idents(ODD_nodoub))
-```
-
-```{r}
-Hk2_p_norm<-FindMarkers(ODD_nodoub, ident.1 = 'Microglia', subset.ident = 'Normoxia', group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
-Hk2_p_hyp<-FindMarkers(ODD_nodoub, ident.1 = 'Microglia', subset.ident = 'Hypoxia', group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
-Hk2_p_norm
-Hk2_p_hyp
-```
-
-```{r}
-ODD_nodoub
-```
-
-```{r}
-#calculate number of doublets excluded
-28114-25850
-```
-
-```{r}
-table(ODD_nodoub$group)
-```
-
-```{r}
-unique(ODD_nodoub$RNA_snn_res.0.2)
-```
-
