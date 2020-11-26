@@ -55,7 +55,7 @@ library(scales)
 ```
 
 ## Load data
-This is the final .RDS object as uploaded on GEO (GSExxx)
+This is the final .RDS object as uploaded on GEO (GSE162079)
 ```{r load_data, paged.print=TRUE}
 ODD<-readRDS("F:/GEO_submission_Butt_et_al/Butt_et_al_hypoxia_Seurat.RDS")
 ```
@@ -80,7 +80,9 @@ ODD@reductions$umap@cell.embeddings<-emb
 
 ### Make plot of UMAP embedding
 ```{r dimplot, fig.align="center", paged.print=TRUE}
-DimPlot(ODD, reduction = 'umap', label =F, repel = T, cols = my_color_palette)+NoLegend()+NoAxes()
+DimPlot(ODD, reduction = 'umap', label =F, repel = T, cols = my_color_palette)+
+  NoLegend()+
+  NoAxes()
 ```
 
 ## Figure 4B
@@ -109,7 +111,8 @@ ODD_tdTom_cluster_counts<-ODD_tdTom_cluster %>%
  group_by(Cluster, Expression, Group) %>%
     count()
 # order levels for display
-ODD_tdTom_cluster_counts$Expression<-factor(ODD_tdTom_cluster_counts$Expression, levels=c("none", "both", "tdTomato", "ODD"))
+ODD_tdTom_cluster_counts$Expression<-factor(ODD_tdTom_cluster_counts$Expression, 
+                                            levels=c("none", "both", "tdTomato", "ODD"))
 ```
 
 ### Clean up cluster lables
@@ -128,9 +131,12 @@ ggplot(ODD_tdTom_cluster_counts, aes(y=n, x=Cluster, fill=Expression)) +
   ylab("Construct expressing cells")+ 
   coord_cartesian(expand = FALSE)+
   scale_fill_manual(values=c("gray72", "lightgoldenrod1", "lightcoral", "darkseagreen3"))+ 
-  annotate(geom = 'text',size=5, label=cluster_labels, y=0.99, x=seq(0:15), angle=90, hjust=1)+
-  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank(), 
-        axis.text.y=element_text(size=19), axis.title=element_text(size=20), legend.text=element_text(size=18), 
+  annotate(geom = 'text',size=5, label=cluster_labels, y=0.99, x=seq(0:15), 
+           angle=90, hjust=1)+
+  theme(axis.title.x=element_blank(),axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(), 
+        axis.text.y=element_text(size=19), axis.title=element_text(size=20), 
+        legend.text=element_text(size=18), 
         legend.title=element_text(size=20),legend.position = "bottom")+
   theme(plot.margin=unit(c(0.3,3.6,0,0.7), "cm"))
 ```
@@ -180,8 +186,10 @@ These cell types correspond to cell types distinguished in immunofluorescence qu
 ```{r rough_clusters, paged.print=TRUE}
 ODD$rough_ident<-NA
 # merge all neuronal types
-ODD$rough_ident[ODD$final_identity=="Glutamatergic1"|ODD$final_identity=="Glutamatergic0"|ODD$final_identity=="Glutamatergic2"|
-               ODD$final_identity=="Glutamatergic3"|ODD$final_identity=="Glutamatergic4"|ODD$final_identity=="Gabaergic"|ODD$final_identity=="Mossy_cells"]<-"Neurons"
+ODD$rough_ident[ODD$final_identity=="Glutamatergic1"|ODD$final_identity=="Glutamatergic0"|
+                  ODD$final_identity=="Glutamatergic2"|ODD$final_identity=="Glutamatergic3"|
+                  ODD$final_identity=="Glutamatergic4"|ODD$final_identity=="Gabaergic"|
+                  ODD$final_identity=="Mossy_cells"]<-"Neurons"
 ODD$rough_ident[ODD$final_identity=="Astrocytes"]<-"Astrocytes"
 ODD$rough_ident[ODD$final_identity=="Oligodendrocytes"|ODD$final_identity=="OPC"]<-"OPC, Oligo"
 ODD$rough_ident[ODD$final_identity=="Microglia"]<-"Microglia"
@@ -190,7 +198,8 @@ ODD$rough_ident[ODD$final_identity=="Endothelial"]<-"Endothelial"
 ### Create dataframe of binary Hk2 expression 
 ```{r Hk2_df, paged.print=TRUE}
 # prepare dataframe
-Hk2_cluster<-data.frame(matrix(nrow = sum(!is.na(ODD$rough_ident)), ncol = 4), row.names = colnames(ODD)[!is.na(ODD$rough_ident)])
+Hk2_cluster<-data.frame(matrix(nrow = sum(!is.na(ODD$rough_ident)), ncol = 4), 
+                        row.names = colnames(ODD)[!is.na(ODD$rough_ident)])
 colnames(Hk2_cluster)=c("Cluster", "Group", "Hk2", "Hif1a")
 # fill in metadata
 Hk2_cluster$Cluster<-ODD$rough_ident[!is.na(ODD$rough_ident)]
@@ -235,17 +244,21 @@ chisq.test(data.frame(c(Hk2_cluster_prop_total$n[1],
 ### Plot Hk2+ proportions per cluster
 ```{r Hk2_prop_plot, fig.align="center", paged.print=TRUE}
 # make factor, order levels
-Hk2_cluster_prop$Cluster<-factor(Hk2_cluster_prop$Cluster, levels=c("Endothelial", 'Neurons', 'Astrocytes', "OPC, Oligo", 'Microglia'))
+Hk2_cluster_prop$Cluster<-factor(Hk2_cluster_prop$Cluster, 
+                                 levels=c("Endothelial", 'Neurons', 'Astrocytes', 
+                                          "OPC, Oligo", 'Microglia'))
 
 # plot
 ggplot(data = Hk2_cluster_prop[Hk2_cluster_prop$Hk2_yn=="yes",], aes(x = Cluster, y = Percent)) +
   geom_col(aes(fill = Group, width=0.6), col='black' , show.legend = FALSE) +
   coord_flip()+ facet_wrap(~Group)+
   theme(axis.ticks.y=element_blank(), axis.text.y=element_text(size=22, angle = 0), 
-        axis.text.x=element_text(size=25), axis.title.y=element_blank(), axis.title.x=element_text(size=25), 
+        axis.text.x=element_text(size=25), axis.title.y=element_blank(), 
+        axis.title.x=element_text(size=25), 
         legend.text=element_text(size=16), legend.title=element_text(size=25))+
   scale_fill_manual(values = c("#FFBDBD","#512274"))+
-  theme(strip.text.x = element_text(size = 30, colour = "black",margin = margin(0.5,0,0.5,0, "cm")))+
+  theme(strip.text.x = element_text(size = 30, colour = "black",
+                                    margin = margin(0.5,0,0.5,0, "cm")))+
   theme(aspect.ratio = 1/1.1)+
   scale_y_continuous( limits = c(0,20), expand = c(0,0))+
   theme(panel.spacing = unit(2, "lines"))+
@@ -266,9 +279,11 @@ FindAllMarkers(ODD, features = "Vegfa")
 ```{r DE_Hk2, paged.print=TRUE, cache=FALSE}
 Idents(ODD)<-ODD$group
 # Microglial expression versus all other cells under normoxia
-FindMarkers(ODD, ident.1 = 'Microglia', subset.ident = 'Normoxia', group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
+FindMarkers(ODD, ident.1 = 'Microglia', subset.ident = 'Normoxia', 
+            group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
 # Microglial expression versus all other cells under hypoxia
-FindMarkers(ODD, ident.1 = 'Microglia', subset.ident = 'Hypoxia', group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
+FindMarkers(ODD, ident.1 = 'Microglia', subset.ident = 'Hypoxia', 
+            group.by = 'final_identity', features = 'Hk2', logfc.threshold = 0.01)
 ```
 ## Supplementary info
 ### Suppl. Figure 3
@@ -287,7 +302,10 @@ VlnPlot(ODD, features = "ODD", cols = my_color_palette, pt.size = 0.1)+
 ```
 Test for expression differences in tdTomato and ODD between microglia and neurons
 ```{r DE_ODD_tdT, paged.print=TRUE}
-FindMarkers(ODD, features = c("tdTomato", "ODD"), logfc.threshold = 0.01, ident.1 = "Microglia", ident.2 = c("Glutamatergic0", "Glutamatergic1", "Glutamatergic2", "Glutamatergic3", "Glutamatergic4", "Gabaergic", "Mossy_cells"))
+FindMarkers(ODD, features = c("tdTomato", "ODD"), logfc.threshold = 0.01, 
+            ident.1 = "Microglia", ident.2 = c("Glutamatergic0", "Glutamatergic1", 
+                                               "Glutamatergic2", "Glutamatergic3", 
+                                               "Glutamatergic4", "Gabaergic", "Mossy_cells"))
 ```
 ### Suppl. Figure 4A
 ```{r vegfa_vlnplots, fig.align="center", paged.print=TRUE}
@@ -299,7 +317,9 @@ VlnPlot(ODD, features = "Vegfa", cols = c("pink","purple"), pt.size = 0.1, split
 ```
 ### Suppl. Figure 4B
 ```{r DE_vegfa, paged.print=TRUE}
-pvals_Vegfa<-lapply(levels(ODD), function(x) FindMarkers(ODD, ident.1 = "Hypoxia", ident.2 = "Normoxia", subset.ident = x, group.by = "group", features = "Vegfa", logfc.threshold = 0.01))
+pvals_Vegfa<-lapply(levels(ODD), function(x) FindMarkers(
+  ODD, ident.1 = "Hypoxia", ident.2 = "Normoxia", subset.ident = x, 
+  group.by = "group", features = "Vegfa", logfc.threshold = 0.01))
 
 names(pvals_Vegfa)<-levels(ODD)
 dplyr::bind_rows(pvals_Vegfa, .id = "Cluster")
